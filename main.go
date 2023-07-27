@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"log"
+	"net/http"
 	"os"
 
 	_ "github.com/joho/godotenv/autoload"
@@ -12,8 +13,10 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/recover"
 
-	"github.com/emanuelef/contrib/otelfiber"
+	"github.com/go-resty/resty/v2"
+	"github.com/gofiber/contrib/otelfiber"
 
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
@@ -39,6 +42,7 @@ func main() {
 	// Create a new tracer provider with a batch span processor and the otlp exporter
 	tp := sdktrace.NewTracerProvider(
 		sdktrace.WithBatcher(exp),
+		sdktrace.WithSampler(sdktrace.AlwaysSample()),
 	)
 
 	// Handle shutdown to ensure all sub processes are closed correctly and telemetry is exported
@@ -62,7 +66,9 @@ func main() {
 
 	app := fiber.New()
 
-	app.Use(otelfiber.Middleware(otelfiber.WithSkipURIs([]string{"/", "/health"})))
+	app.Use(otelfiber.Middleware(otelfiber.WithNext(func(c *fiber.Ctx) bool {
+		return c.Path() == "/health"
+	})))
 
 	app.Use(recover.New())
 	app.Use(cors.New())
@@ -73,10 +79,53 @@ func main() {
 	})
 
 	app.Get("/hello", func(c *fiber.Ctx) error {
-		return c.Send(nil)
+		resp, err := otelhttp.Get(c.UserContext(), "https://pokeapi.co/api/v2/pokemon/ditto")
+		if err != nil {
+			return fiber.ErrInternalServerError
+		}
+
+		resp, err = otelhttp.Get(c.UserContext(), "https://pokeapi.co/api/v2/pokemon/ditto")
+
+		if err != nil {
+			return fiber.ErrInternalServerError
+		}
+
+		return c.SendString(resp.Status)
 	})
 
-	err = app.Listen("0.0.0.0:8099")
+	app.Get("/hello-http", func(c *fiber.Ctx) error {
+		client := http.Client{
+			Transport: otelhttp.NewTransport(http.DefaultTransport),
+		}
+
+		req, err := http.NewRequestWithContext(c.UserContext(), "GET", "https://pokeapi.co/api/v2/pokemon/ditto", nil)
+		if err != nil {
+			return err
+		}
+		resp, _ := client.Do(req)
+
+		req, err = http.NewRequestWithContext(c.UserContext(), "GET", "https://pokeapi.co/api/v2/pokemon/ditto", nil)
+		if err != nil {
+			return err
+		}
+		resp, _ = client.Do(req)
+
+		// otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(restyReq.Header))
+
+		return c.SendString(resp.Status)
+	})
+
+	app.Get("/hello-resty", func(c *fiber.Ctx) error {
+		client := resty.New()
+
+		resp, _ := client.R().
+			EnableTrace().
+			Get("https://pokeapi.co/api/v2/pokemon/ditto")
+
+		return c.SendString(resp.Status())
+	})
+
+	err = app.Listen("127.0.0.1:8099")
 	if err != nil {
 		log.Panic(err)
 	}
