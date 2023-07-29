@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	_ "github.com/joho/godotenv/autoload"
 
@@ -18,10 +19,13 @@ import (
 
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -39,10 +43,23 @@ func main() {
 		log.Fatalf("failed to initialize exporter: %e", err)
 	}
 
+	resource, rErr := resource.Merge(
+		resource.Default(),
+		resource.NewWithAttributes(
+			semconv.SchemaURL,
+			attribute.String("environment", "test"),
+		),
+	)
+
+	if rErr != nil {
+		panic(rErr)
+	}
+
 	// Create a new tracer provider with a batch span processor and the otlp exporter
 	tp := sdktrace.NewTracerProvider(
 		sdktrace.WithBatcher(exp),
 		sdktrace.WithSampler(sdktrace.AlwaysSample()),
+		sdktrace.WithResource(resource),
 	)
 
 	// Handle shutdown to ensure all sub processes are closed correctly and telemetry is exported
@@ -63,6 +80,9 @@ func main() {
 	)
 
 	tracer = tp.Tracer(serviceName)
+	meter := otel.Meter("my-meter")
+
+	requestCounter, _ := meter.Int64Counter("hello_request_counter")
 
 	app := fiber.New()
 
@@ -79,6 +99,8 @@ func main() {
 	})
 
 	app.Get("/hello", func(c *fiber.Ctx) error {
+		requestCounter.Add(c.UserContext(), 1)
+
 		resp, err := otelhttp.Get(c.UserContext(), "https://pokeapi.co/api/v2/pokemon/ditto")
 		if err != nil {
 			return fiber.ErrInternalServerError
@@ -89,6 +111,20 @@ func main() {
 		if err != nil {
 			return fiber.ErrInternalServerError
 		}
+
+		// Get current span and add new attributes
+		span := trace.SpanFromContext(c.UserContext())
+		span.SetAttributes(attribute.Bool("isTrue", true), attribute.String("stringAttr", "Ciao"))
+
+		// Create a child span
+		_, childSpan := tracer.Start(c.UserContext(), "custom-span")
+		time.Sleep(1 * time.Second)
+		childSpan.End()
+
+		time.Sleep(1 * time.Second)
+
+		// Add an event to the current span
+		span.AddEvent("Done Activity")
 
 		return c.SendString(resp.Status)
 	})
@@ -116,9 +152,23 @@ func main() {
 	})
 
 	app.Get("/hello-resty", func(c *fiber.Ctx) error {
-		client := resty.New()
+		//client := resty.New()
 
-		resp, _ := client.R().
+		span := trace.SpanFromContext(c.UserContext())
+		time.Sleep(1 * time.Second)
+		span.AddEvent("Done Fake long running task")
+
+		client := resty.NewWithClient(
+			&http.Client{
+				Transport: otelhttp.NewTransport(http.DefaultTransport),
+			},
+		)
+
+		restyReq := client.R()
+		restyReq.SetContext(c.UserContext())
+		otel.GetTextMapPropagator().Inject(c.UserContext(), propagation.HeaderCarrier(restyReq.Header))
+
+		resp, _ := restyReq.
 			EnableTrace().
 			Get("https://pokeapi.co/api/v2/pokemon/ditto")
 
