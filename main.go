@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"net/http"
+	"net/http/httptrace"
 	"os"
 	"time"
 
@@ -17,6 +18,7 @@ import (
 	"github.com/go-resty/resty/v2"
 	"github.com/gofiber/contrib/otelfiber"
 
+	"go.opentelemetry.io/contrib/instrumentation/net/http/httptrace/otelhttptrace"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
@@ -28,6 +30,8 @@ import (
 	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
 	"go.opentelemetry.io/otel/trace"
 )
+
+const externalURL = "https://pokeapi.co/api/v2/pokemon/ditto"
 
 var serviceName = os.Getenv("OTEL_SERVICE_NAME")
 
@@ -101,12 +105,12 @@ func main() {
 	app.Get("/hello", func(c *fiber.Ctx) error {
 		requestCounter.Add(c.UserContext(), 1)
 
-		resp, err := otelhttp.Get(c.UserContext(), "https://pokeapi.co/api/v2/pokemon/ditto")
+		resp, err := otelhttp.Get(c.UserContext(), externalURL)
 		if err != nil {
 			return fiber.ErrInternalServerError
 		}
 
-		resp, err = otelhttp.Get(c.UserContext(), "https://pokeapi.co/api/v2/pokemon/ditto")
+		resp, err = otelhttp.Get(c.UserContext(), externalURL)
 
 		if err != nil {
 			return fiber.ErrInternalServerError
@@ -117,8 +121,9 @@ func main() {
 		span.SetAttributes(attribute.Bool("isTrue", true), attribute.String("stringAttr", "Ciao"))
 
 		// Create a child span
-		_, childSpan := tracer.Start(c.UserContext(), "custom-span")
+		ctx, childSpan := tracer.Start(c.UserContext(), "custom-span")
 		time.Sleep(1 * time.Second)
+		otelhttp.Get(ctx, externalURL)
 		childSpan.End()
 
 		time.Sleep(1 * time.Second)
@@ -131,22 +136,27 @@ func main() {
 
 	app.Get("/hello-http", func(c *fiber.Ctx) error {
 		client := http.Client{
-			Transport: otelhttp.NewTransport(http.DefaultTransport),
+			Transport: otelhttp.NewTransport(
+				http.DefaultTransport,
+				otelhttp.WithClientTrace(func(ctx context.Context) *httptrace.ClientTrace {
+					return otelhttptrace.NewClientTrace(ctx)
+				})),
 		}
 
-		req, err := http.NewRequestWithContext(c.UserContext(), "GET", "https://pokeapi.co/api/v2/pokemon/ditto", nil)
+		req, err := http.NewRequestWithContext(c.UserContext(), "GET", externalURL, nil)
 		if err != nil {
 			return err
 		}
+
+		otel.GetTextMapPropagator().Inject(c.UserContext(), propagation.HeaderCarrier(req.Header))
+
 		resp, _ := client.Do(req)
 
-		req, err = http.NewRequestWithContext(c.UserContext(), "GET", "https://pokeapi.co/api/v2/pokemon/ditto", nil)
+		req, err = http.NewRequestWithContext(c.UserContext(), "GET", externalURL, nil)
 		if err != nil {
 			return err
 		}
 		resp, _ = client.Do(req)
-
-		// otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(restyReq.Header))
 
 		return c.SendString(resp.Status)
 	})
@@ -154,26 +164,49 @@ func main() {
 	app.Get("/hello-resty", func(c *fiber.Ctx) error {
 		//client := resty.New()
 
+		// get current span
 		span := trace.SpanFromContext(c.UserContext())
-		time.Sleep(1 * time.Second)
-		span.AddEvent("Done Fake long running task")
+
+		// add events to span
+		time.Sleep(100 * time.Millisecond)
+		span.AddEvent("Done first fake long running task")
+		time.Sleep(150 * time.Millisecond)
+		span.AddEvent("Done second fake long running task")
 
 		client := resty.NewWithClient(
 			&http.Client{
-				Transport: otelhttp.NewTransport(http.DefaultTransport),
+				Transport: otelhttp.NewTransport(http.DefaultTransport,
+					otelhttp.WithClientTrace(func(ctx context.Context) *httptrace.ClientTrace {
+						return otelhttptrace.NewClientTrace(ctx)
+					})),
 			},
 		)
 
 		restyReq := client.R()
 		restyReq.SetContext(c.UserContext())
+
+		// Needed to propagate the trace remotely
 		otel.GetTextMapPropagator().Inject(c.UserContext(), propagation.HeaderCarrier(restyReq.Header))
 
 		resp, _ := restyReq.
 			EnableTrace().
-			Get("https://pokeapi.co/api/v2/pokemon/ditto")
+			Get(externalURL)
+
+		_, _ = restyReq.
+			EnableTrace().
+			Get(externalURL)
+
+		// simulate some post processing
+		time.Sleep(50 * time.Millisecond)
 
 		return c.SendString(resp.Status())
 	})
+
+	customCtx, spanMain := tracer.Start(context.Background(), "custom-span-main")
+	resp, _ := otelhttp.Get(customCtx, externalURL)
+	spanMain.End()
+
+	log.Println(resp.Status)
 
 	err = app.Listen("127.0.0.1:8099")
 	if err != nil {
