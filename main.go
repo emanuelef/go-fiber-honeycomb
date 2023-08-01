@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"net/http/httptrace"
@@ -111,6 +112,7 @@ func main() {
 		}
 
 		resp, err = otelhttp.Get(c.UserContext(), externalURL)
+		_, _ = ioutil.ReadAll(resp.Body)
 
 		if err != nil {
 			return fiber.ErrInternalServerError
@@ -123,7 +125,8 @@ func main() {
 		// Create a child span
 		ctx, childSpan := tracer.Start(c.UserContext(), "custom-span")
 		time.Sleep(1 * time.Second)
-		otelhttp.Get(ctx, externalURL)
+		resp, _ = otelhttp.Get(ctx, externalURL)
+		_, _ = ioutil.ReadAll(resp.Body)
 		childSpan.End()
 
 		time.Sleep(1 * time.Second)
@@ -151,12 +154,15 @@ func main() {
 		otel.GetTextMapPropagator().Inject(c.UserContext(), propagation.HeaderCarrier(req.Header))
 
 		resp, _ := client.Do(req)
+		_, _ = ioutil.ReadAll(resp.Body)
+
 
 		req, err = http.NewRequestWithContext(c.UserContext(), "GET", externalURL, nil)
 		if err != nil {
 			return err
 		}
 		resp, _ = client.Do(req)
+		_, _ = ioutil.ReadAll(resp.Body)
 
 		return c.SendString(resp.Status)
 	})
@@ -188,13 +194,10 @@ func main() {
 		// Needed to propagate the trace remotely
 		otel.GetTextMapPropagator().Inject(c.UserContext(), propagation.HeaderCarrier(restyReq.Header))
 
-		resp, _ := restyReq.
-			EnableTrace().
-			Get(externalURL)
+		resp, _ := restyReq.Get(externalURL)
 
-		_, _ = restyReq.
-			EnableTrace().
-			Get(externalURL)
+
+		_, _ = restyReq.Get(externalURL)
 
 		// simulate some post processing
 		time.Sleep(50 * time.Millisecond)

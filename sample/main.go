@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"io/ioutil"
 	"log"
 	"time"
 
@@ -62,7 +63,8 @@ func main() {
 
 	ctx, childSpan := tracer.Start(ctx, "custom-span")
 	time.Sleep(1 * time.Second)
-	_, _ = otelhttp.Get(ctx, externalURL)
+	respClient, _ := otelhttp.Get(ctx, externalURL)
+	_, _ = ioutil.ReadAll(respClient.Body)
 	childSpan.End()
 
 	time.Sleep(10 * time.Second)
