@@ -2,7 +2,8 @@ package main
 
 import (
 	"context"
-	"io/ioutil"
+	"encoding/json"
+	"io"
 	"log"
 	"net/http"
 	"net/http/httptrace"
@@ -85,9 +86,6 @@ func main() {
 	)
 
 	tracer = tp.Tracer(serviceName)
-	meter := otel.Meter("my-meter")
-
-	requestCounter, _ := meter.Int64Counter("hello_request_counter")
 
 	app := fiber.New()
 
@@ -104,15 +102,13 @@ func main() {
 	})
 
 	app.Get("/hello", func(c *fiber.Ctx) error {
-		requestCounter.Add(c.UserContext(), 1)
-
-		resp, err := otelhttp.Get(c.UserContext(), externalURL)
+		_, err := otelhttp.Get(c.UserContext(), externalURL)
 		if err != nil {
 			return fiber.ErrInternalServerError
 		}
 
-		resp, err = otelhttp.Get(c.UserContext(), externalURL)
-		_, _ = ioutil.ReadAll(resp.Body)
+		resp, err := otelhttp.Get(c.UserContext(), externalURL)
+		_, _ = io.ReadAll(resp.Body)
 
 		if err != nil {
 			return fiber.ErrInternalServerError
@@ -124,12 +120,12 @@ func main() {
 
 		// Create a child span
 		ctx, childSpan := tracer.Start(c.UserContext(), "custom-span")
-		time.Sleep(1 * time.Second)
+		time.Sleep(10 * time.Millisecond)
 		resp, _ = otelhttp.Get(ctx, externalURL)
-		_, _ = ioutil.ReadAll(resp.Body)
+		_, _ = io.ReadAll(resp.Body)
 		childSpan.End()
 
-		time.Sleep(1 * time.Second)
+		time.Sleep(20 * time.Millisecond)
 
 		// Add an event to the current span
 		span.AddEvent("Done Activity")
@@ -154,21 +150,22 @@ func main() {
 		otel.GetTextMapPropagator().Inject(c.UserContext(), propagation.HeaderCarrier(req.Header))
 
 		resp, _ := client.Do(req)
-		_, _ = ioutil.ReadAll(resp.Body)
-
+		_, _ = io.ReadAll(resp.Body)
 
 		req, err = http.NewRequestWithContext(c.UserContext(), "GET", externalURL, nil)
 		if err != nil {
 			return err
 		}
 		resp, _ = client.Do(req)
-		_, _ = ioutil.ReadAll(resp.Body)
+		body, _ := io.ReadAll(resp.Body)
+		result := []map[string]any{}
+		_ = json.Unmarshal([]byte(body), &result)
 
 		return c.SendString(resp.Status)
 	})
 
 	app.Get("/hello-resty", func(c *fiber.Ctx) error {
-		//client := resty.New()
+		// client := resty.New()
 
 		// get current span
 		span := trace.SpanFromContext(c.UserContext())
@@ -196,7 +193,6 @@ func main() {
 
 		resp, _ := restyReq.Get(externalURL)
 
-
 		_, _ = restyReq.Get(externalURL)
 
 		// simulate some post processing
@@ -207,6 +203,7 @@ func main() {
 
 	customCtx, spanMain := tracer.Start(context.Background(), "custom-span-main")
 	resp, _ := otelhttp.Get(customCtx, externalURL)
+	_, _ = io.ReadAll(resp.Body)
 	spanMain.End()
 
 	log.Println(resp.Status)

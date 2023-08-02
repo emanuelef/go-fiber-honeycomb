@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"io/ioutil"
+	"io"
 	"log"
 	"time"
 
@@ -21,12 +21,11 @@ const externalURL = "https://pokeapi.co/api/v2/pokemon/ditto"
 var tracer trace.Tracer
 
 func init() {
-	// Name the tracer after the package, or the service if you are in main
 	tracer = otel.Tracer("github.com/emanuelef/go-fiber-honeycomb/sample")
 }
 
 func InitializeGlobalTracerProvider() (*sdktrace.TracerProvider, error) {
-	// Initialize tracer
+	// OpenTelemetry exporter for tracing telemetry to be written to an output destination as JSON.
 	exp, err := stdouttrace.New(stdouttrace.WithPrettyPrint())
 	if err != nil {
 		return nil, err
@@ -59,13 +58,15 @@ func main() {
 	if err != nil {
 		log.Fatalln("Unable to create a global trace provider", err)
 	}
-	defer tp.Shutdown(ctx)
+
+	defer func() {
+		_ = tp.Shutdown(ctx)
+	}()
 
 	ctx, childSpan := tracer.Start(ctx, "custom-span")
 	time.Sleep(1 * time.Second)
 	respClient, _ := otelhttp.Get(ctx, externalURL)
-	_, _ = ioutil.ReadAll(respClient.Body)
+	_, _ = io.ReadAll(respClient.Body)
 	childSpan.End()
-
-	time.Sleep(10 * time.Second)
+	time.Sleep(1 * time.Second)
 }
