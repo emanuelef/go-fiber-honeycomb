@@ -208,7 +208,7 @@ func main() {
 
 	log.Println(resp.Status)
 
-	err = app.Listen("127.0.0.1:8099")
+	err = app.Listen("0.0.0.0:8099")
 	if err != nil {
 		log.Panic(err)
 	}
