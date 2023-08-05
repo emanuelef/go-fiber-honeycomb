@@ -35,5 +35,5 @@ jobs:
           context: .
           file: ./Dockerfile
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
+          tags: docker.io/emanuelef/otel_fiber:0.0.1
           labels: ${{ steps.meta.outputs.labels }}
