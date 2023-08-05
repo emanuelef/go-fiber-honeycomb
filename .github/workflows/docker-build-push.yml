@@ -37,3 +37,12 @@ jobs:
           push: true
           tags: docker.io/emafuma/otel_fiber:0.0.1
           labels: ${{ steps.meta.outputs.labels }}
+
+      - name: Scan Docker image 🐳
+        uses: snyk/actions/docker@master
+        continue-on-error: true
+        with:
+          image: docker.io/emafuma/otel_fiber:0.0.1
+          args: --file=Dockerfile --severity-threshold=high --sarif-file-output=snyk.sarif
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
