@@ -1,0 +1,18 @@
+name: Scan Docker image
+
+on:
+  workflow_dispatch:
+
+jobs:
+  scan_from_registry:
+    name: Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Scan Docker image 🐳
+        uses: snyk/actions/docker@master
+        continue-on-error: true
+        with:
+          image: docker.io/emafuma/otel_fiber:0.0.1
+          args: --file=Dockerfile --severity-threshold=high --sarif-file-output=snyk.sarif
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
