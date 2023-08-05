@@ -4,7 +4,7 @@ COPY main.go .
 COPY go.mod .
 COPY go.sum .
 RUN go mod download
-RUN go build -o otel_honeycomb ./app/main.go
+RUN go build -o otel_honeycomb ./main.go
 
 FROM alpine:latest AS runner
 WORKDIR /home/app
