@@ -11,6 +11,7 @@ on:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
+  VERSION_NUMBER: latest
 
 jobs:
   push_to_registry:
@@ -33,7 +34,7 @@ jobs:
 
       - name: Release version
         if: ${{ github.event_name == 'release' }}
-        run: echo "VERSION_NUMBER=$((github.event.release.tag_name))"
+        run: echo ${{ env.VERSION_NUMBER }}
         env:
           VERSION_NUMBER: ${{ github.event.release.tag_name }}
 
