@@ -2,6 +2,9 @@ name: Publish Docker image to GHCR
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
   release:
     types: [published]
 
@@ -18,6 +21,12 @@ jobs:
       packages: write
       id-token: write
     steps:
+      - name: Dump GitHub context
+        env:
+          GITHUB_CONTEXT: ${{ toJson(github) }}
+        run: |
+          echo "$GITHUB_CONTEXT"
+
       - name: Check out the repo
         uses: actions/checkout@v3
 
