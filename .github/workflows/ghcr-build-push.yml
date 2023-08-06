@@ -31,6 +31,11 @@ jobs:
         run: |
           echo "VERSION_NUMBER_WITH_OFFSET=$((1000+GITHUB_RUN_NUMBER))" >> $GITHUB_ENV
 
+      - name: Release version
+        if: github.event_name == 'release'
+        run: |
+          echo "VERSION_NUMBER_WITH_OFFSET=$((github.event.relase.tag_name))" >> $GITHUB_ENV
+
       - name: Check out the repo
         uses: actions/checkout@v3
 
@@ -61,6 +66,6 @@ jobs:
           context: .
           file: ./Dockerfile
           push: true
-          platforms: linux/amd64,linux/arm/v7,linux/arm64
+          #platforms: linux/amd64,linux/arm/v7,linux/arm64
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
