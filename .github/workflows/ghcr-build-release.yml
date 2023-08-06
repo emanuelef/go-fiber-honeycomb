@@ -1,10 +1,8 @@
 name: Publish Docker image to GHCR
 
 on:
-  workflow_dispatch:
-  push:
-    branches:
-      - main
+  release:
+    types: [published]
 
 env:
   REGISTRY: ghcr.io
@@ -25,10 +23,6 @@ jobs:
           GITHUB_CONTEXT: ${{ toJson(github) }}
         run: |
           echo "$GITHUB_CONTEXT"
-
-      - name: create a custom version using run number offset by 1000 (run_number + 1000)
-        run: |
-          echo "VERSION_NUMBER=$((1000+GITHUB_RUN_NUMBER))" >> $GITHUB_ENV
 
       - name: Check out the repo
         uses: actions/checkout@v3
@@ -51,8 +45,6 @@ jobs:
         uses: docker/metadata-action@v4
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          tags: |
-            type=raw,value={{date 'YYYYMMDD'}}-${{ env.VERSION_NUMBER }}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v4
