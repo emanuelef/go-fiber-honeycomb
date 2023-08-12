@@ -7,9 +7,9 @@ import (
 	"log"
 	"net/http"
 	"net/http/httptrace"
-	"os"
 	"time"
 
+	"github.com/emanuelef/go-fiber-honeycomb/otel_instrumentation"
 	_ "github.com/joho/godotenv/autoload"
 
 	"github.com/gofiber/fiber/v2"
@@ -24,49 +24,24 @@ import (
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
-	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	"go.opentelemetry.io/otel/propagation"
-	"go.opentelemetry.io/otel/sdk/resource"
-	sdktrace "go.opentelemetry.io/otel/sdk/trace"
-	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
 	"go.opentelemetry.io/otel/trace"
 )
 
-const externalURL = "https://pokeapi.co/api/v2/pokemon/ditto"
-
-var serviceName = os.Getenv("OTEL_SERVICE_NAME")
+const (
+	externalURL     = "https://pokeapi.co/api/v2/pokemon/ditto"
+	secondaryAppURL = "http://localhost:8082/hello"
+)
 
 var tracer trace.Tracer
 
+func init() {
+	tracer = otel.Tracer("github.com/emanuelef/go-fiber-honeycomb")
+}
+
 func main() {
 	ctx := context.Background()
-
-	// Configure a new OTLP exporter using environment variables for sending data to Honeycomb over gRPC
-	clientOTel := otlptracegrpc.NewClient()
-	exp, err := otlptrace.New(ctx, clientOTel)
-	if err != nil {
-		log.Fatalf("failed to initialize exporter: %e", err)
-	}
-
-	resource, rErr := resource.Merge(
-		resource.Default(),
-		resource.NewWithAttributes(
-			semconv.SchemaURL,
-			attribute.String("environment", "test"),
-		),
-	)
-
-	if rErr != nil {
-		panic(rErr)
-	}
-
-	// Create a new tracer provider with a batch span processor and the otlp exporter
-	tp := sdktrace.NewTracerProvider(
-		sdktrace.WithBatcher(exp),
-		sdktrace.WithSampler(sdktrace.AlwaysSample()),
-		sdktrace.WithResource(resource),
-	)
+	tp, exp, err := otel_instrumentation.InitializeGlobalTracerProvider(ctx)
 
 	// Handle shutdown to ensure all sub processes are closed correctly and telemetry is exported
 	defer func() {
@@ -74,18 +49,9 @@ func main() {
 		_ = tp.Shutdown(ctx)
 	}()
 
-	// Register the global Tracer provider
-	otel.SetTracerProvider(tp)
-
-	// Register the W3C trace context and baggage propagators so data is propagated across services/processes
-	otel.SetTextMapPropagator(
-		propagation.NewCompositeTextMapPropagator(
-			propagation.TraceContext{},
-			propagation.Baggage{},
-		),
-	)
-
-	tracer = tp.Tracer(serviceName)
+	if err != nil {
+		log.Fatalf("failed to initialize OpenTelemetry: %e", err)
+	}
 
 	app := fiber.New()
 
@@ -114,6 +80,13 @@ func main() {
 			return fiber.ErrInternalServerError
 		}
 
+		resp, err = otelhttp.Get(c.UserContext(), secondaryAppURL)
+		_, _ = io.ReadAll(resp.Body)
+
+		if err != nil {
+			return fiber.ErrInternalServerError
+		}
+
 		// Get current span and add new attributes
 		span := trace.SpanFromContext(c.UserContext())
 		span.SetAttributes(attribute.Bool("isTrue", true), attribute.String("stringAttr", "Ciao"))
@@ -129,6 +102,10 @@ func main() {
 
 		// Add an event to the current span
 		span.AddEvent("Done Activity")
+
+		_, span = tracer.Start(ctx, "operation-name")
+		span.AddEvent("ciao")
+		span.End()
 
 		return c.SendString(resp.Status)
 	})
@@ -201,14 +178,17 @@ func main() {
 		return c.SendString(resp.Status())
 	})
 
-	customCtx, spanMain := tracer.Start(context.Background(), "custom-span-main")
-	resp, _ := otelhttp.Get(customCtx, externalURL)
-	_, _ = io.ReadAll(resp.Body)
-	spanMain.End()
+	// This is to generate a new span that is not a descendand of an existing one
+	go func() {
+		for range time.Tick(time.Minute) {
+			ctx, span := tracer.Start(context.Background(), "timed-operation")
+			resp, _ := otelhttp.Get(ctx, externalURL)
+			_, _ = io.ReadAll(resp.Body)
+			span.End()
+		}
+	}()
 
-	log.Println(resp.Status)
-
-	err = app.Listen("0.0.0.0:8099")
+	err = app.Listen("0.0.0.0:8080")
 	if err != nil {
 		log.Panic(err)
 	}
