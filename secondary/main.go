@@ -27,7 +27,7 @@ const externalURL = "https://pokeapi.co/api/v2/pokemon/ditto"
 var tracer trace.Tracer
 
 func init() {
-	tracer = otel.Tracer("github.com/emanuelef/go-fiber-honeycomb")
+	tracer = otel.Tracer("github.com/emanuelef/go-fiber-honeycomb/secondary")
 }
 
 func main() {

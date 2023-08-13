@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/emanuelef/go-fiber-honeycomb/otel_instrumentation"
+	protos "github.com/emanuelef/go-fiber-honeycomb/proto"
 	_ "github.com/joho/godotenv/autoload"
 
 	"github.com/gofiber/fiber/v2"
@@ -20,12 +21,15 @@ import (
 	"github.com/go-resty/resty/v2"
 	"github.com/gofiber/contrib/otelfiber"
 
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/httptrace/otelhttptrace"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 const (
@@ -80,6 +84,7 @@ func main() {
 			return fiber.ErrInternalServerError
 		}
 
+		// make sure secondary app is running
 		resp, err = otelhttp.Get(c.UserContext(), secondaryAppURL)
 		_, _ = io.ReadAll(resp.Body)
 
@@ -176,6 +181,23 @@ func main() {
 		time.Sleep(50 * time.Millisecond)
 
 		return c.SendString(resp.Status())
+	})
+
+	app.Get("/hello-grpc", func(c *fiber.Ctx) error {
+		conn, err := grpc.Dial("127.0.0.1:7070",
+			grpc.WithTransportCredentials(insecure.NewCredentials()),
+			grpc.WithUnaryInterceptor(otelgrpc.UnaryClientInterceptor()))
+		if err != nil {
+			log.Fatalf("did not connect: %v", err)
+		}
+		defer conn.Close()
+		cli := protos.NewGreeterClient(conn)
+
+		r, err := cli.SayHello(c.UserContext(), &protos.HelloRequest{Greeting: "ciao"})
+
+		log.Printf("Greeting: %s", r.GetReply())
+
+		return c.Send(nil)
 	})
 
 	// This is to generate a new span that is not a descendand of an existing one
