@@ -46,7 +46,7 @@ func (s *server) SayHello(ctx context.Context, in *protos.HelloRequest) (*protos
 
 func main() {
 	ctx := context.Background()
-	tp, exp, err := otel_instrumentation.InitializeGlobalTracerProvider(ctx)
+	tp, exp, _ := otel_instrumentation.InitializeGlobalTracerProvider(ctx)
 
 	// Handle shutdown to ensure all sub processes are closed correctly and telemetry is exported
 	defer func() {

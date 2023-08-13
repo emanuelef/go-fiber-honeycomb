@@ -193,7 +193,7 @@ func main() {
 		defer conn.Close()
 		cli := protos.NewGreeterClient(conn)
 
-		r, err := cli.SayHello(c.UserContext(), &protos.HelloRequest{Greeting: "ciao"})
+		r, _ := cli.SayHello(c.UserContext(), &protos.HelloRequest{Greeting: "ciao"})
 
 		log.Printf("Greeting: %s", r.GetReply())
 
