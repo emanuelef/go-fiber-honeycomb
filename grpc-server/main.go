@@ -32,12 +32,10 @@ type server struct {
 
 // SayHello implements helloworld.GreeterServer
 func (s *server) SayHello(ctx context.Context, in *protos.HelloRequest) (*protos.HelloResponse, error) {
-	// log.Printf("Received: %v", in.GetGreeting())
+	log.Printf("Received: %v", in.GetGreeting())
 
-	/*
-		_, childSpan := tracer.Start(ctx, "SayHelloCustom")
-		defer childSpan.End()
-	*/
+	_, childSpan := tracer.Start(ctx, "SayHelloCustom")
+	defer childSpan.End()
 
 	if in.Greeting == "" {
 		return nil, status.Errorf(codes.InvalidArgument, "request missing required field: Greeting")
