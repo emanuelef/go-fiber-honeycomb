@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"log"
+	"os"
 	"time"
 
 	"github.com/emanuelef/go-fiber-honeycomb/otel_instrumentation"
@@ -28,6 +30,14 @@ var tracer trace.Tracer
 
 func init() {
 	tracer = otel.Tracer("github.com/emanuelef/go-fiber-honeycomb/secondary")
+}
+
+func getEnv(key, fallback string) string {
+	value, exists := os.LookupEnv(key)
+	if !exists {
+		value = fallback
+	}
+	return value
 }
 
 func main() {
@@ -88,7 +98,11 @@ func main() {
 		return c.SendString(resp.Status)
 	})
 
-	err = app.Listen("0.0.0.0:8082")
+	host := getEnv("HOST", "localhost")
+	port := getEnv("PORT", "8082")
+	hostAddress := fmt.Sprintf("%s:%s", host, port)
+
+	err = app.Listen(hostAddress)
 	if err != nil {
 		log.Panic(err)
 	}

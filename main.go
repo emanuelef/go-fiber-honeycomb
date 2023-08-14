@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -34,9 +35,8 @@ import (
 )
 
 const (
-	externalURL     = "https://pokeapi.co/api/v2/pokemon/ditto"
-	secondaryAppURL = "http://localhost:8082/hello"
-	grpcTarget      = "localhost:7070"
+	externalURL = "https://pokeapi.co/api/v2/pokemon/ditto"
+	grpcTarget  = "localhost:7070"
 )
 
 var tracer trace.Tracer
@@ -94,8 +94,12 @@ func main() {
 			return fiber.ErrInternalServerError
 		}
 
+		secondaryHost := getEnv("SECONDARY_HOST", "localhost")
+		secondaryAddress := fmt.Sprintf("http://%s:8082", secondaryHost)
+		secondaryHelloUrl := fmt.Sprintf("%s/hello", secondaryAddress)
+
 		// make sure secondary app is running
-		resp, err = otelhttp.Get(c.UserContext(), secondaryAppURL)
+		resp, err = otelhttp.Get(c.UserContext(), secondaryHelloUrl)
 		_, _ = io.ReadAll(resp.Body)
 
 		if err != nil {
@@ -218,7 +222,11 @@ func main() {
 		}
 	}()
 
-	err = app.Listen("0.0.0.0:8080")
+	host := getEnv("HOST", "localhost")
+	port := getEnv("PORT", "8080")
+	hostAddress := fmt.Sprintf("%s:%s", host, port)
+
+	err = app.Listen(hostAddress)
 	if err != nil {
 		log.Panic(err)
 	}
