@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"net/http/httptrace"
+	"os"
 	"time"
 
 	"github.com/emanuelef/go-fiber-honeycomb/otel_instrumentation"
@@ -35,9 +36,18 @@ import (
 const (
 	externalURL     = "https://pokeapi.co/api/v2/pokemon/ditto"
 	secondaryAppURL = "http://localhost:8082/hello"
+	grpcTarget      = "localhost:7070"
 )
 
 var tracer trace.Tracer
+
+func getEnv(key, fallback string) string {
+	value, exists := os.LookupEnv(key)
+	if !exists {
+		value = fallback
+	}
+	return value
+}
 
 func init() {
 	tracer = otel.Tracer("github.com/emanuelef/go-fiber-honeycomb")
@@ -147,8 +157,6 @@ func main() {
 	})
 
 	app.Get("/hello-resty", func(c *fiber.Ctx) error {
-		// client := resty.New()
-
 		// get current span
 		span := trace.SpanFromContext(c.UserContext())
 
@@ -184,7 +192,7 @@ func main() {
 	})
 
 	app.Get("/hello-grpc", func(c *fiber.Ctx) error {
-		conn, err := grpc.Dial("127.0.0.1:7070",
+		conn, err := grpc.Dial(grpcTarget,
 			grpc.WithTransportCredentials(insecure.NewCredentials()),
 			grpc.WithUnaryInterceptor(otelgrpc.UnaryClientInterceptor()))
 		if err != nil {
