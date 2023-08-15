@@ -40,16 +40,16 @@ const (
 
 var tracer trace.Tracer
 
+func init() {
+	tracer = otel.Tracer("github.com/emanuelef/go-fiber-honeycomb")
+}
+
 func getEnv(key, fallback string) string {
 	value, exists := os.LookupEnv(key)
 	if !exists {
 		value = fallback
 	}
 	return value
-}
-
-func init() {
-	tracer = otel.Tracer("github.com/emanuelef/go-fiber-honeycomb")
 }
 
 func main() {
@@ -81,17 +81,13 @@ func main() {
 	})
 
 	app.Get("/hello", func(c *fiber.Ctx) error {
-		_, err := otelhttp.Get(c.UserContext(), externalURL)
-		if err != nil {
-			return fiber.ErrInternalServerError
-		}
-
 		resp, err := otelhttp.Get(c.UserContext(), externalURL)
-		_, _ = io.ReadAll(resp.Body)
 
 		if err != nil {
-			return fiber.ErrInternalServerError
+			return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
 		}
+
+		_, _ = io.ReadAll(resp.Body) // This is needed to close the span
 
 		secondaryHost := getEnv("SECONDARY_HOST", "localhost")
 		secondaryAddress := fmt.Sprintf("http://%s:8082", secondaryHost)
@@ -99,11 +95,12 @@ func main() {
 
 		// make sure secondary app is running
 		resp, err = otelhttp.Get(c.UserContext(), secondaryHelloUrl)
-		_, _ = io.ReadAll(resp.Body)
 
 		if err != nil {
-			return fiber.ErrInternalServerError
+			return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
 		}
+
+		_, _ = io.ReadAll(resp.Body) // This is needed to close the span
 
 		// Get current span and add new attributes
 		span := trace.SpanFromContext(c.UserContext())
@@ -164,9 +161,9 @@ func main() {
 		span := trace.SpanFromContext(c.UserContext())
 
 		// add events to span
-		time.Sleep(100 * time.Millisecond)
+		time.Sleep(70 * time.Millisecond)
 		span.AddEvent("Done first fake long running task")
-		time.Sleep(150 * time.Millisecond)
+		time.Sleep(90 * time.Millisecond)
 		span.AddEvent("Done second fake long running task")
 
 		client := resty.NewWithClient(
@@ -179,16 +176,19 @@ func main() {
 		)
 
 		restyReq := client.R()
-		restyReq.SetContext(c.UserContext())
+		restyReq.SetContext(c.UserContext()) // makes it possible to use the HTTP request trace_id
 
-		// Needed to propagate the trace remotely
+		// Needed to propagate the traceparent remotely
 		otel.GetTextMapPropagator().Inject(c.UserContext(), propagation.HeaderCarrier(restyReq.Header))
 
+		// run HTTP request first time
 		resp, _ := restyReq.Get(externalURL)
 
+		// run second time and notice http.getconn time compared to first one
 		_, _ = restyReq.Get(externalURL)
 
 		// simulate some post processing
+		span.AddEvent("Start post processing")
 		time.Sleep(50 * time.Millisecond)
 
 		return c.SendString(resp.Status())
@@ -222,6 +222,8 @@ func main() {
 
 	// This is to generate a new span that is not a descendand of an existing one
 	go func() {
+		// in a real app it is better to use time.NewTicker so that the tivker will be
+		// recovered by garbage collector
 		for range time.Tick(time.Minute) {
 			ctx, span := tracer.Start(context.Background(), "timed-operation")
 			resp, _ := otelhttp.Get(ctx, externalURL)
