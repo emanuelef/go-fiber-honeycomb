@@ -52,6 +52,16 @@ func getEnv(key, fallback string) string {
 	return value
 }
 
+// The context will carry the traceid and span id
+// so once is passed it can get be used access to the current span
+// or create a child one
+func exampleChildSpan(ctx context.Context) {
+	_, anotherSpan := tracer.Start(ctx, "operation-name")
+	anotherSpan.AddEvent("ciao")
+	time.Sleep(10 * time.Millisecond)
+	anotherSpan.End()
+}
+
 func main() {
 	ctx := context.Background()
 	tp, exp, err := otel_instrumentation.InitializeGlobalTracerProvider(ctx)
@@ -117,11 +127,7 @@ func main() {
 
 		// Add an event to the current span
 		span.AddEvent("Done Activity")
-
-		_, anotherSpan := tracer.Start(ctx, "operation-name")
-		anotherSpan.AddEvent("ciao")
-		anotherSpan.End()
-
+		exampleChildSpan(ctx)
 		return c.SendString(resp.Status)
 	})
 
