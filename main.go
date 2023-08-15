@@ -36,7 +36,6 @@ import (
 
 const (
 	externalURL = "https://pokeapi.co/api/v2/pokemon/ditto"
-	grpcTarget  = "localhost:7070"
 )
 
 var tracer trace.Tracer
@@ -196,16 +195,25 @@ func main() {
 	})
 
 	app.Get("/hello-grpc", func(c *fiber.Ctx) error {
+		grpcHost := getEnv("GRPC_TARGET", "localhost")
+		grpcTarget := fmt.Sprintf("%s:7070", grpcHost)
+
 		conn, err := grpc.Dial(grpcTarget,
 			grpc.WithTransportCredentials(insecure.NewCredentials()),
 			grpc.WithUnaryInterceptor(otelgrpc.UnaryClientInterceptor()))
 		if err != nil {
-			log.Fatalf("did not connect: %v", err)
+			log.Printf("Did not connect: %v", err)
+			return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
 		}
+
 		defer conn.Close()
 		cli := protos.NewGreeterClient(conn)
 
-		r, _ := cli.SayHello(c.UserContext(), &protos.HelloRequest{Greeting: "ciao"})
+		r, err := cli.SayHello(c.UserContext(), &protos.HelloRequest{Greeting: "ciao"})
+		if err != nil {
+			log.Printf("Error: %v", err)
+			return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
+		}
 
 		log.Printf("Greeting: %s", r.GetReply())
 

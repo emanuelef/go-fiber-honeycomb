@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net"
+	"os"
 
 	"github.com/emanuelef/go-fiber-honeycomb/otel_instrumentation"
 	"github.com/emanuelef/go-fiber-honeycomb/proto"
@@ -23,6 +25,14 @@ var tracer trace.Tracer
 func init() {
 	// Name the tracer after the package, or the service if you are in main
 	tracer = otel.Tracer("github.com/emanuelef/go-fiber-honeycomb/grpc-server")
+}
+
+func getEnv(key, fallback string) string {
+	value, exists := os.LookupEnv(key)
+	if !exists {
+		value = fallback
+	}
+	return value
 }
 
 // server is used to implement helloworld.GreeterServer.
@@ -54,7 +64,11 @@ func main() {
 		_ = tp.Shutdown(ctx)
 	}()
 
-	lis, err := net.Listen("tcp", "0.0.0.0:7070")
+	host := getEnv("HOST", "localhost")
+	port := getEnv("PORT", "7070")
+	hostAddress := fmt.Sprintf("%s:%s", host, port)
+
+	lis, err := net.Listen("tcp", hostAddress)
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
 	}
