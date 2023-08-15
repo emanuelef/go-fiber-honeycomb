@@ -92,7 +92,7 @@ func main() {
 
 	app.Get("/hello", func(c *fiber.Ctx) error {
 		return c.Send(nil)
-	}
+	})
 
 	app.Get("/hello-otelhttp", func(c *fiber.Ctx) error {
 		resp, err := otelhttp.Get(c.UserContext(), externalURL)
