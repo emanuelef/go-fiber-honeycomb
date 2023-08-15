@@ -85,15 +85,7 @@ func main() {
 		resp, _ = otelhttp.Get(ctx, externalURL)
 		_, _ = io.ReadAll(resp.Body)
 		childSpan.End()
-
 		time.Sleep(20 * time.Millisecond)
-
-		// Add an event to the current span
-		span.AddEvent("Done Activity")
-
-		_, span = tracer.Start(ctx, "operation-name")
-		span.AddEvent("ciao")
-		span.End()
 
 		return c.SendString(resp.Status)
 	})
