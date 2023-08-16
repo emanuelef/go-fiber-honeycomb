@@ -53,10 +53,18 @@ func getEnv(key, fallback string) string {
 }
 
 // The context will carry the traceid and span id
-// so once is passed it can get be used access to the current span
-// or create a child one
+// so once is passed it can be used access to the current span
+// or create a child one, the function below will work if placed anywhere
+// even in other packages
 func exampleChildSpan(ctx context.Context) {
-	_, anotherSpan := tracer.Start(ctx, "operation-name")
+	// Get the current span from context
+	// this can be needed to add an attribute or an event
+	// but not necessary if the intention is then just to create a child span
+	span := trace.SpanFromContext(ctx)
+	span.SetAttributes(attribute.String("stringAttr", "Ciao"))
+
+	// Create a child span
+	_, anotherSpan := tracer.Start(ctx, "child-operation")
 	anotherSpan.AddEvent("ciao")
 	time.Sleep(10 * time.Millisecond)
 	anotherSpan.End()
@@ -86,14 +94,27 @@ func main() {
 	app.Use(cors.New())
 	app.Use(compress.New())
 
+	// Just to check health and an example of a very frequent request
+	// that we might not want to generate traces
 	app.Get("/health", func(c *fiber.Ctx) error {
 		return c.Send(nil)
 	})
 
+	// Basic GET API to show the OtelFiber middleware is taking
+	// care of creating the span when called 
 	app.Get("/hello", func(c *fiber.Ctx) error {
 		return c.Send(nil)
 	})
 
+	// Creates a child span
+	app.Get("/hello-child", func(c *fiber.Ctx) error {
+		_, childSpan := tracer.Start(c.UserContext(), "custom-child-span")
+		time.Sleep(10 * time.Millisecond) // simulate some work
+		childSpan.End()
+		return c.Send(nil)
+	})
+
+	// Runs HTTP requests to a public URL and to the secondary app
 	app.Get("/hello-otelhttp", func(c *fiber.Ctx) error {
 		resp, err := otelhttp.Get(c.UserContext(), externalURL)
 
@@ -135,7 +156,7 @@ func main() {
 		return c.SendString(resp.Status)
 	})
 
-	app.Get("/hello-http", func(c *fiber.Ctx) error {
+	app.Get("/hello-http-client", func(c *fiber.Ctx) error {
 		client := http.Client{
 			Transport: otelhttp.NewTransport(
 				http.DefaultTransport,
