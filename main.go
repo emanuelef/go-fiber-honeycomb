@@ -28,7 +28,7 @@ import (
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/propagation"
+	//"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -39,6 +39,12 @@ const (
 )
 
 var tracer trace.Tracer
+
+var (
+	secondaryHost     = getEnv("SECONDARY_HOST", "localhost")
+	secondaryAddress  = fmt.Sprintf("http://%s:8082", secondaryHost)
+	secondaryHelloUrl = fmt.Sprintf("%s/hello", secondaryAddress)
+)
 
 func init() {
 	tracer = otel.Tracer("github.com/emanuelef/go-fiber-honeycomb")
@@ -117,16 +123,11 @@ func main() {
 	// Runs HTTP requests to a public URL and to the secondary app
 	app.Get("/hello-otelhttp", func(c *fiber.Ctx) error {
 		resp, err := otelhttp.Get(c.UserContext(), externalURL)
-
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
 		}
 
 		_, _ = io.ReadAll(resp.Body) // This is needed to close the span
-
-		secondaryHost := getEnv("SECONDARY_HOST", "localhost")
-		secondaryAddress := fmt.Sprintf("http://%s:8082", secondaryHost)
-		secondaryHelloUrl := fmt.Sprintf("%s/hello", secondaryAddress)
 
 		// make sure secondary app is running
 		resp, err = otelhttp.Get(c.UserContext(), secondaryHelloUrl)
@@ -170,12 +171,13 @@ func main() {
 			return err
 		}
 
-		otel.GetTextMapPropagator().Inject(c.UserContext(), propagation.HeaderCarrier(req.Header))
+		// Needed to propagate the traceparent remotely if not setting the otelhttp.NewTransport
+		// otel.GetTextMapPropagator().Inject(c.UserContext(), propagation.HeaderCarrier(req.Header))
 
 		resp, _ := client.Do(req)
 		_, _ = io.ReadAll(resp.Body)
 
-		req, err = http.NewRequestWithContext(c.UserContext(), "GET", externalURL, nil)
+		req, err = http.NewRequestWithContext(c.UserContext(), "GET", secondaryHelloUrl, nil)
 		if err != nil {
 			return err
 		}
@@ -214,14 +216,16 @@ func main() {
 		restyReq := client.R()
 		restyReq.SetContext(c.UserContext()) // makes it possible to use the HTTP request trace_id
 
-		// Needed to propagate the traceparent remotely
-		otel.GetTextMapPropagator().Inject(c.UserContext(), propagation.HeaderCarrier(restyReq.Header))
+		// Needed to propagate the traceparent remotely if not setting the otelhttp.NewTransport
+		// otel.GetTextMapPropagator().Inject(c.UserContext(), propagation.HeaderCarrier(restyReq.Header))
 
 		// run HTTP request first time
 		resp, _ := restyReq.Get(externalURL)
 
 		// run second time and notice http.getconn time compared to first one
 		_, _ = restyReq.Get(externalURL)
+
+		_, _ = restyReq.Get(secondaryHelloUrl)
 
 		// simulate some post processing
 		span.AddEvent("Start post processing")
