@@ -101,7 +101,7 @@ func main() {
 	})
 
 	// Basic GET API to show the OtelFiber middleware is taking
-	// care of creating the span when called 
+	// care of creating the span when called
 	app.Get("/hello", func(c *fiber.Ctx) error {
 		return c.Send(nil)
 	})
@@ -196,6 +196,11 @@ func main() {
 		span.AddEvent("Done first fake long running task")
 		time.Sleep(90 * time.Millisecond)
 		span.AddEvent("Done second fake long running task")
+
+		span.AddEvent("log", trace.WithAttributes(
+			attribute.String("log.severity", "warning"),
+			attribute.String("log.message", "Example log"),
+		))
 
 		client := resty.NewWithClient(
 			&http.Client{
