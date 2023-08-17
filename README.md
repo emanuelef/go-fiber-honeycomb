@@ -49,6 +49,11 @@ To run all the endpoints implemented in the main app:
 ```shell
 ./run_http_requests.sh
 ```
-<img width="400" alt="Honeycomb Home" src="https://github.com/emanuelef/go-fiber-honeycomb/assets/48717/86adce7b-332e-41e3-ba3a-720dd671c586">
 
-<img width="400" alt="Honecomb resty traces" src="https://github.com/emanuelef/go-fiber-honeycomb/assets/48717/186a6c56-38f1-47c2-9792-fa98a20ef980">
+Fome Home you will see the traces appearing at the bottom (or you can run a query)
+
+<img width="500" alt="Honeycomb Home" src="https://github.com/emanuelef/go-fiber-honeycomb/assets/48717/86adce7b-332e-41e3-ba3a-720dd671c586">  
+
+Clicking on the button on the left will open the Traces view
+
+<img width="500" alt="Honecomb resty traces" src="https://github.com/emanuelef/go-fiber-honeycomb/assets/48717/186a6c56-38f1-47c2-9792-fa98a20ef980">
