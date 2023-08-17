@@ -49,7 +49,6 @@ To run all the endpoints implemented in the main app:
 ```shell
 ./run_http_requests.sh
 ```
-![Screenshot 2023-08-17 at 16 40 09](https://github.com/emanuelef/go-fiber-honeycomb/assets/48717/86adce7b-332e-41e3-ba3a-720dd671c586)
+<img width="400" alt="Honeycomb Home" src="https://github.com/emanuelef/go-fiber-honeycomb/assets/48717/86adce7b-332e-41e3-ba3a-720dd671c586">
 
-![Screenshot 2023-08-17 at 16 40 44](https://github.com/emanuelef/go-fiber-honeycomb/assets/48717/186a6c56-38f1-47c2-9792-fa98a20ef980)
-
+<img width="400" alt="Honecomb resty traces" src="https://github.com/emanuelef/go-fiber-honeycomb/assets/48717/186a6c56-38f1-47c2-9792-fa98a20ef980">
