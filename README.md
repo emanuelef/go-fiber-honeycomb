@@ -45,7 +45,7 @@ from each folder:
 curl http://127.0.0.1:8080/hello
 ```
 
-To run all the endpoints implemented in the main app:
+To call all the endpoints implemented in the main app:
 ```shell
 ./run_http_requests.sh
 ```
