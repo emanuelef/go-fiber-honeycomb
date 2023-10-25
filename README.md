@@ -76,3 +76,4 @@ All the endpoints served are GETs without any query or path parameters.
 - /hello-http-client: Similar to /hello-otelhttp but using http.Client
 - /hello-resty: Similar to /hello-otelhttp but using [Resty](https://github.com/go-resty/resty)
 - /hello-grpc: Makes a gRPC requesto to the [grpc-server](grpc-server/main.go)
+
