@@ -28,7 +28,6 @@ import (
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
-	//"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -240,7 +239,8 @@ func main() {
 
 		conn, err := grpc.Dial(grpcTarget,
 			grpc.WithTransportCredentials(insecure.NewCredentials()),
-			grpc.WithUnaryInterceptor(otelgrpc.UnaryClientInterceptor()))
+			grpc.WithStatsHandler(otelgrpc.NewClientHandler()),
+		)
 		if err != nil {
 			log.Printf("Did not connect: %v", err)
 			return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
