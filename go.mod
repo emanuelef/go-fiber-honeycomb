@@ -5,9 +5,9 @@ go 1.21
 toolchain go1.21.0
 
 require (
-	github.com/go-resty/resty/v2 v2.11.0
+	github.com/go-resty/resty/v2 v2.12.0
 	github.com/gofiber/contrib/otelfiber v1.0.10
-	github.com/gofiber/fiber/v2 v2.52.2
+	github.com/gofiber/fiber/v2 v2.52.3
 	github.com/joho/godotenv v1.5.1
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.49.0
 	go.opentelemetry.io/contrib/instrumentation/net/http/httptrace/otelhttptrace v0.49.0
@@ -45,6 +45,6 @@ require (
 	golang.org/x/net v0.22.0 // indirect
 	golang.org/x/sys v0.18.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20240304212257-790db918fca8 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20240304212257-790db918fca8 // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20240325203815-454cdb8f5daa // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20240325203815-454cdb8f5daa // indirect
 )
