@@ -7,7 +7,7 @@ toolchain go1.21.0
 require (
 	github.com/go-resty/resty/v2 v2.12.0
 	github.com/gofiber/contrib/otelfiber v1.0.10
-	github.com/gofiber/fiber/v2 v2.52.3
+	github.com/gofiber/fiber/v2 v2.52.4
 	github.com/joho/godotenv v1.5.1
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.49.0
 	go.opentelemetry.io/contrib/instrumentation/net/http/httptrace/otelhttptrace v0.49.0
@@ -24,7 +24,7 @@ require (
 
 require (
 	github.com/andybalholm/brotli v1.1.0 // indirect
-	github.com/cenkalti/backoff/v4 v4.2.1 // indirect
+	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/go-logr/logr v1.4.1 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
